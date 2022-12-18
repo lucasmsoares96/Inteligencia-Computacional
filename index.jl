@@ -18,6 +18,8 @@ md"""
 # ╔═╡ 360bb77d-96ae-4d20-84f5-f78ad0b8ed83
 md"""
 1. [Multilayer Perceptron](https://lucasmsoares96.github.io/Inteligencia-Computacional/MLP.html)
+1. [Controle-Fuzzy](https://lucasmsoares96.github.io/Inteligencia-Computacional/Controle-Fuzzy.html)
+1. [C-Means](https://lucasmsoares96.github.io/Inteligencia-Computacional/C-Means.html)
 1. [Previsão Bolsa de Valores](https://lucasmsoares96.github.io/Inteligencia-Computacional/Comparativo.html)
 """
 
@@ -36,7 +38,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.3"
 manifest_format = "2.0"
-project_hash = "502a5e5263da26fcd619b7b7033f402a42a81ffc"
+project_hash = "08cc58b1fbde73292d848136b97991797e6c5429"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]

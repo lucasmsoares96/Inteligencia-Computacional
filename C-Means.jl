@@ -4,225 +4,191 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 2070ca57-d02e-492e-afaf-081dc4ca6559
+# ╔═╡ a2e5c422-6598-11ed-3964-c3d5c845ba45
 begin
 	using Plots
 	using PlutoUI
 	using Statistics
+	using LinearAlgebra
 	using Random
 	TableOfContents(title="Índice")
 end
 
-# ╔═╡ 1beb82cf-43a5-4fab-b311-7c096b435413
+# ╔═╡ a12712b9-5024-40ba-8f44-f26e3a7ae9b9
 md"""
-# Multilayer Perceptron
+# C-Means
 """
 
-# ╔═╡ e5d1d090-1bd5-4e3f-b39c-e324d525a47f
+# ╔═╡ 601d2ec7-a260-4136-a69b-69f3c8c12be6
 md"""
-## Introdução
-Neste relatório será apresentado uma implementação e uma análiase do algoritmo backpropagation do multilayer perceptron aplicado ao problema XOR (ou exclusivo). Este problema é um exemplo simples de uma solução não linearmente separável, no qual uma única camada não consegue resolver. Em resumo o multilayer perceptron consiste em encadear todas as saidas de uma camada a todas as entradas da camada seguinte, retro propagar o erro e ajustar os pesos da última camada para a primeira camada.
+Esse notebook contem a implementação do algoritmo de agrupamento C-Means.
 """
 
-# ╔═╡ b2b141c5-e211-44d2-912a-a0d50805b004
-LocalResource("maxresdefault.jpg")
-
-# ╔═╡ 71442437-e06c-4d6a-a37a-0f977429ea0f
+# ╔═╡ 3423837a-0c53-494b-b29c-70af95b7e281
 md"""
-Para a realização desse trabalho foram utilizados como referência:
-1. Slides da disciplina
-1. Playlist do canal [3Blue1Brown](https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi)
-1. Playlist do canal [The Code Train](https://www.youtube.com/playlist?list=PLRqwX-V7Uu6aCibgK1PTWWu9by6XFdCfh)
-1. Livro [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com/index.html)
-
-Esse material foi escolhido por apresentar uma implementação simples de uma rede MLP utilizando a notação de matriz, o que facilita o entendimento dos conceitos
+## Funções Auxiliares
+A primeira parte deste algoritmo consiste em definir as funções que serão utilizadas no processo de agrupamento. Estas funções são:
+1. euclidian()
+1. d()
+1. p()
+1. g()
+1. centroid()
 """
 
-# ╔═╡ a8df7778-538b-4bc9-8646-7a5393a6645a
+# ╔═╡ 334f5ab2-22e6-432d-a0ec-611fcca0343c
 md"""
-## Implementação
-Primeiramente precisamos definir o nosso vetor de entrada x e o nosso vetor de saída y para o problema XOR.
+A função **centroid**, calcula o centroid de cada grupo de pontos.
 """
 
-# ╔═╡ 7d9649e6-3d75-4889-a9e2-4fce6ef669be
-x = [
-	0 0
-	0 1
-	1 0
-	1 1
-]
+# ╔═╡ b3b2cef2-a8b3-4ffd-a5c8-a9cbd938d854
+centroid(x) = [mean(x[1,:]), mean(x[2,:])]
 
-# ╔═╡ f2b5359c-510a-495b-a338-2337c2eb3136
-y = [
-	0
-	1
-	1
-	0
-]
-
-# ╔═╡ 254dfe10-6816-4e62-bff7-f78d63fe99f0
+# ╔═╡ 9bb34713-ed81-4841-9baa-5b832d43b677
 md"""
-Em seguida devemos definir a nossa função de ativação e a derivada da função de ativação que será utilizada no cálculo do vetor gradiente.
+A função **euclidian** calcula a disância de um ponto à outro
 """
 
-# ╔═╡ e1d0412f-3e30-4fbd-b9a7-27e53e2d0521
-σ(x) = 1 / ( 1 + exp(-x) )
+# ╔═╡ 6ac58c3c-eaf9-4426-a66b-f6179f552194
+euclidian(x1,y1,x2,y2) = sqrt((x2-x1)^2 + (y2-y1)^2)
 
-# ╔═╡ 808804a5-7c81-4f9c-b6e8-090f293d9b16
-dσ(x) =  x * (1 - x)
-
-# ╔═╡ dc634efa-27e6-454b-81e3-1fc1e3ec392a
+# ╔═╡ 64950ba5-24d8-4db2-a9a1-99e8ddf745c6
 md"""
-Também precisamos definir uma estrutura que armazenará as informações da nossa rede neural.
+A função **d** calcula a matriz de distância entre cada ponto e cada um dos centros do sistema
 """
 
-# ╔═╡ 2fb6bf23-2586-4d49-ac5e-1884a18981ca
-# outer constructor
-# ou com Base.@kwdef
+# ╔═╡ 0df8a789-2f27-4f25-bb1f-188b14847a14
+d(X,C) = hcat(
+	(
+		X |> 
+		eachcol .|> 
+		a -> map(
+			b -> euclidian(a...,b...), 
+			eachcol(C)
+		)
+	)...
+)
+
+# ╔═╡ d12dd595-de2b-4bb5-8fc3-f31d765e5339
+md"""
+A função **p** retorna a matriz de pertinencia que armazena, para cada ponto,o centro de menor distância.
+"""
+
+# ╔═╡ bc82c98e-fc3e-4a7f-922b-0a331fb0661c
+p(D) = D |> eachcol .|> argmin
+
+# ╔═╡ a3ce773d-19c9-4158-a176-a1cf784086fc
+md"""
+A função **g** retorna um vetor de vértices agrupadas de acordo com o seu centro mais próximo.
+"""
+
+# ╔═╡ 6ac32ec5-0961-4ac2-b402-9573d93388da
+g(n,X,P) = hcat(
+	(findall(
+		isequal(n),
+		P) .|> i -> X[:,i]
+	)...
+)
+
+# ╔═╡ 0d0c6e8f-62dd-47ad-8fdd-8d1455bde87a
+md"""
+## Constantes
+"""
+
+# ╔═╡ b7b41691-b775-4f4f-84a2-0b95db2227e6
+md"""
+Para executar o algoritmo C-Means precisamos definir os pontos que queremos agrupar e os centros iniciais.
+"""
+
+# ╔═╡ 32883833-5bbe-4e02-8e5d-f57321c0c03c
+md"""
+Gerar 3 grupos de pontos aleatórios com 100 pontos cada e combina-los em um único vetor.
+"""
+
+# ╔═╡ 1e198ce4-91e8-4303-bed3-12fb753f932f
 begin
-	mutable struct NeuralNetwork
-		input_nodes
-		hidden_nodes
-		output_nodes
-		weights_ih
-		weights_ho
-		bias_h
-		bias_o
-		η
-		last_e
+	x1 = randn(2,200) .+ [6,6]
+	x2 = randn(2,200) .+ [0,6]
+	x3 = randn(2,200) .+ [3,0]
+	X = [x1 x2 x3]
+end
+
+# ╔═╡ d8c6b18a-58f3-45e5-87b1-3d5b6d9b5773
+md"""
+Definir os centros iniciais baseados nos valores extremos dos pontos aleatórios ou baseados em pontos que já pertencam a cada grupo.
+"""
+
+# ╔═╡ bd2a5727-c95b-4d0d-9b1a-732dcb76e698
+begin
+	e = extrema(X)
+	Cn = rand(e[1]:e[2], 2,3)
+end
+
+# ╔═╡ 94fa65fb-dba2-4f93-868b-e95c28d87d15
+md"""
+## Execução
+"""
+
+# ╔═╡ dfa3d091-a8a1-41fc-935f-2b0b8a566454
+md"""
+Definindo as funções auxiliares e constantes necessárias, agora podemos executar o algorimo C-Means. De forma resumida, o seu funcionamento consiste em agrupar os pontos mais próximos do centro e mover este centro para o centroid de um grupo de pontos.
+"""
+
+# ╔═╡ 00d1791f-4c1e-4d9d-84c7-709b452b6d4c
+function c_means(X,Cn)
+	C = nothing
+	cont = 0
+	G = nothing
+	anim = @animate while Cn != C 
+		cont += 1
+		C = Cn
+		# agrupar
+		G = 1:3 .|> n -> g(n,X,p(d(X,C)))
+		# novos centros
+		Cn = 1:3 .|> (x -> centroid(G[x])) |> x-> hcat(x...)
+		scatter(
+			[G[1][1,:],G[2][1,:],G[3][1,:]],  # eixo x dos 3 grupos
+			[G[1][2,:],G[2][2,:],G[3][2,:]];  # eixo y dos 3 grupos
+			lims = e .+ (-1,1),
+		)
+		scatter!(C[1,:],C[2,:];
+			lims = e .+ (-1,1),
+		)
 	end
-	NeuralNetwork(i,h,o,η) = NeuralNetwork(
-		i,
-		h,
-		o,
-		rand(-1:0.01:1,h,i),
-		rand(-1:0.01:1,o,h),
-		rand(-1:0.01:1,h,1),
-		rand(-1:0.01:1,o,1),
-		η,
-		0
+	return (anim, cont, G, C)
+end
+
+# ╔═╡ 6b63afa4-2b74-4cd4-b84e-18e044bcce2e
+begin
+	anim, cont, G, C = c_means(X,Cn);
+	gif(anim, fps=2)
+end
+
+# ╔═╡ 5397e422-9d4e-422d-b19c-148c2b05c121
+md"""
+## Resultados
+"""
+
+# ╔═╡ 52d75e12-8a7f-4160-ab08-b18a213a6cce
+Markdown.parse("""
+O algoritmo gastou $cont iterações para encontrar o centro do sistema. E o resultado final foi o seguinte:
+""")
+
+# ╔═╡ 980a5461-1338-415b-a30a-73a6adaa3ea6
+begin
+	scatter(
+		[G[1][1,:],G[2][1,:],G[3][1,:]],  # eixo x dos 3 grupos
+		[G[1][2,:],G[2][2,:],G[3][2,:]];  # eixo y dos 3 grupos
+		lims = e .+ (-1,1),
+	)
+	scatter!(C[1,:],C[2,:];
+		lims = e .+ (-1,1),
 	)
 end
-
-# ╔═╡ ef5367b4-811a-4b4a-8bdb-3f10c22351b8
-md"""
-Com isso temos o necessário para implementar as funções de treinamento da rede e a função de previsão.
-"""
-
-# ╔═╡ 36462e38-b96b-4a9d-9caa-2c51401c8a0e
-md"""
-A função de previsão recebe como argumento uma rede neural e uma entrada para prever a saída. A saída da camada oculta é obtida multiplicando a matriz de pesos da camada interna para a oculta pela a matriz entrada somada com a matriz de bias da camada oculta. Já a saída da camada de saída é obtida multiplicando a matriz dos pesos entre a camada oculta e a camada de saída pela matriz de saída da camada oculta somada com a matriz de bias da camada de saída.
-"""
-
-# ╔═╡ 5b4ec109-f988-4bf1-92cc-e2e40f4dd0c4
-begin
-	predict(a) = x -> predict(a,x)
-	function predict(this::NeuralNetwork,X)
-		H = this.weights_ih * X .+ this.bias_h .|> σ
-		O = this.weights_ho * H .+ this.bias_o .|> σ
-		O .|> round
-	end
-end
-
-# ╔═╡ d02b825a-70aa-4549-9d16-606994f39de4
-md"""
-A função de treinamento recebe como argumento uma rede neural, uma amostra dos dados de entrada e a saída desejada. O algoritmo consiste em 3 passos: Feedforward, Backpropagation Output e Backpropagation Hidden. A etapa Feedforward consiste na previsão do sistema. Em seguida, a saída desejada será utilizada para calcular o erro da rede, subtraíndo a pela saída da rede. A partir deste erro podemos ajustar o peso para melhorar a precisão da rede nas etapas de Backpropagation Output e Hidden.
-"""
-
-# ╔═╡ 0aa61377-a374-4c5e-9aa2-54fede251cc4
-begin
-	fit!(X,Y) = nn -> fit(nn,X,Y)
-	function fit!(this::NeuralNetwork,X,Y)
-		
-		### Feedforward
-		
-		H = σ.(this.weights_ih * X + this.bias_h)
-		O = σ.(this.weights_ho * H + this.bias_o)
-	
-		### Backpropagation Output
-		
-		Oe = Y .- O
-		O∇ = dσ.(O) .* Oe .* this.η
-		
-		δho = O∇ * H'
-		this.weights_ho += δho
-		this.bias_o     += O∇
-	
-		### Backpropagation Hidden
-	
-		He = this.weights_ho' * Oe
-		H∇ = dσ.(H) .* He .* this.η
-		δih = H∇ * X'
-	
-		this.weights_ih += δih
-		this.bias_h     += H∇
-		
-		this.last_e += mean(abs.(Oe))
-	end
-end
-
-# ╔═╡ fbd1066f-eb42-49cf-908e-1b93b281f6f9
-md"""
-Por fim devemos treinar o nosso modelo para todas as entradas de X pela quantidade de épocas estabelecidas até se atingit um erro dentro da tolerância.
-"""
-
-# ╔═╡ b6013f22-d9d6-4502-b93d-14c5c8c2f8b3
-nn = NeuralNetwork(
-		2,
-		2,
-		1,
-		0.3
-	)
-
-# ╔═╡ aa075c80-a5b6-4e9d-87e1-69ccfee56792
-begin
-	push!(y) = x -> Base.push!(y,x)
-	τ = 0.05
-	Ω = 10000
-	epocas = 0
-	erroEpoca = Float64[]
-	
-	while true
-		nn.last_e = 0
-		
-		size(x,1) |> randperm .|> i -> fit!(nn,x[i,:],y[i])
-		
-		# for i in randperm(size(x,1))
-		# 	fit!(nn,x[i,:],y[i])
-		# end
-		
-		global epocas += 1
-		nn.last_e / length(x) |> push!(erroEpoca)
-		
-		(epocas ≥ Ω || erroEpoca[end] ≤ τ) ? break : continue
-	end
-end
-
-# ╔═╡ 537976fd-1fb7-4235-8759-dfe53deeb9f5
-md"""
-## Análise
-"""
-
-# ╔═╡ 10436ba9-4bca-4a02-8d8d-48a44550c8b7
-md"""
-É possível notar que o a rede demora certa de 1000 iterações para atingir um erro aceitável.
-"""
-
-# ╔═╡ 30c1d9da-5ac2-4217-8669-16871cafa9a0
-println("Epocas: ", epocas, " \n", "Erro:   ", erroEpoca[end])
-
-# ╔═╡ fb498595-7ca6-4af5-ad86-85c1a63f753e
-plot(1:epocas, erroEpoca)
-
-# ╔═╡ fc1c4258-5ce2-4400-b3c8-72cecaa80a8a
-nn
-
-# ╔═╡ 1f7d1208-2c25-4fb0-b7a6-da55bfd2b7ba
-x |> eachrow .|> predict(nn) .|> println;
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -239,7 +205,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.3"
 manifest_format = "2.0"
-project_hash = "5aea8cf7b3ce2a34368e390ed8e5ab6f1e79c921"
+project_hash = "5ce36fb8811c2d408572de9c9bf2f9ebc746a85d"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -1199,32 +1165,32 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╟─1beb82cf-43a5-4fab-b311-7c096b435413
-# ╠═2070ca57-d02e-492e-afaf-081dc4ca6559
-# ╟─e5d1d090-1bd5-4e3f-b39c-e324d525a47f
-# ╟─b2b141c5-e211-44d2-912a-a0d50805b004
-# ╟─71442437-e06c-4d6a-a37a-0f977429ea0f
-# ╟─a8df7778-538b-4bc9-8646-7a5393a6645a
-# ╠═7d9649e6-3d75-4889-a9e2-4fce6ef669be
-# ╠═f2b5359c-510a-495b-a338-2337c2eb3136
-# ╟─254dfe10-6816-4e62-bff7-f78d63fe99f0
-# ╠═e1d0412f-3e30-4fbd-b9a7-27e53e2d0521
-# ╠═808804a5-7c81-4f9c-b6e8-090f293d9b16
-# ╟─dc634efa-27e6-454b-81e3-1fc1e3ec392a
-# ╠═2fb6bf23-2586-4d49-ac5e-1884a18981ca
-# ╟─ef5367b4-811a-4b4a-8bdb-3f10c22351b8
-# ╟─36462e38-b96b-4a9d-9caa-2c51401c8a0e
-# ╠═5b4ec109-f988-4bf1-92cc-e2e40f4dd0c4
-# ╟─d02b825a-70aa-4549-9d16-606994f39de4
-# ╠═0aa61377-a374-4c5e-9aa2-54fede251cc4
-# ╟─fbd1066f-eb42-49cf-908e-1b93b281f6f9
-# ╠═b6013f22-d9d6-4502-b93d-14c5c8c2f8b3
-# ╠═aa075c80-a5b6-4e9d-87e1-69ccfee56792
-# ╟─537976fd-1fb7-4235-8759-dfe53deeb9f5
-# ╟─10436ba9-4bca-4a02-8d8d-48a44550c8b7
-# ╠═30c1d9da-5ac2-4217-8669-16871cafa9a0
-# ╠═fb498595-7ca6-4af5-ad86-85c1a63f753e
-# ╠═fc1c4258-5ce2-4400-b3c8-72cecaa80a8a
-# ╠═1f7d1208-2c25-4fb0-b7a6-da55bfd2b7ba
+# ╟─a12712b9-5024-40ba-8f44-f26e3a7ae9b9
+# ╠═a2e5c422-6598-11ed-3964-c3d5c845ba45
+# ╟─601d2ec7-a260-4136-a69b-69f3c8c12be6
+# ╟─3423837a-0c53-494b-b29c-70af95b7e281
+# ╟─334f5ab2-22e6-432d-a0ec-611fcca0343c
+# ╠═b3b2cef2-a8b3-4ffd-a5c8-a9cbd938d854
+# ╟─9bb34713-ed81-4841-9baa-5b832d43b677
+# ╠═6ac58c3c-eaf9-4426-a66b-f6179f552194
+# ╟─64950ba5-24d8-4db2-a9a1-99e8ddf745c6
+# ╠═0df8a789-2f27-4f25-bb1f-188b14847a14
+# ╟─d12dd595-de2b-4bb5-8fc3-f31d765e5339
+# ╠═bc82c98e-fc3e-4a7f-922b-0a331fb0661c
+# ╟─a3ce773d-19c9-4158-a176-a1cf784086fc
+# ╠═6ac32ec5-0961-4ac2-b402-9573d93388da
+# ╟─0d0c6e8f-62dd-47ad-8fdd-8d1455bde87a
+# ╟─b7b41691-b775-4f4f-84a2-0b95db2227e6
+# ╟─32883833-5bbe-4e02-8e5d-f57321c0c03c
+# ╠═1e198ce4-91e8-4303-bed3-12fb753f932f
+# ╟─d8c6b18a-58f3-45e5-87b1-3d5b6d9b5773
+# ╠═bd2a5727-c95b-4d0d-9b1a-732dcb76e698
+# ╟─94fa65fb-dba2-4f93-868b-e95c28d87d15
+# ╟─dfa3d091-a8a1-41fc-935f-2b0b8a566454
+# ╠═00d1791f-4c1e-4d9d-84c7-709b452b6d4c
+# ╠═6b63afa4-2b74-4cd4-b84e-18e044bcce2e
+# ╟─5397e422-9d4e-422d-b19c-148c2b05c121
+# ╟─52d75e12-8a7f-4160-ab08-b18a213a6cce
+# ╠═980a5461-1338-415b-a30a-73a6adaa3ea6
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

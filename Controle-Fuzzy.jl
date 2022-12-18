@@ -4,228 +4,297 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 2070ca57-d02e-492e-afaf-081dc4ca6559
+# ╔═╡ fbe88d29-171d-4778-87af-6ffd5a98fea7
 begin
 	using Plots
 	using PlutoUI
 	using Statistics
-	using Random
 	TableOfContents(title="Índice")
 end
 
-# ╔═╡ 1beb82cf-43a5-4fab-b311-7c096b435413
+# ╔═╡ af34fa35-4e62-4df0-9c54-6a91e9beb3aa
 md"""
-# Multilayer Perceptron
+# Controlador Fuzzy
 """
 
-# ╔═╡ e5d1d090-1bd5-4e3f-b39c-e324d525a47f
+# ╔═╡ 01295753-e7aa-4f05-b592-d9e4d055091e
 md"""
-## Introdução
-Neste relatório será apresentado uma implementação e uma análiase do algoritmo backpropagation do multilayer perceptron aplicado ao problema XOR (ou exclusivo). Este problema é um exemplo simples de uma solução não linearmente separável, no qual uma única camada não consegue resolver. Em resumo o multilayer perceptron consiste em encadear todas as saidas de uma camada a todas as entradas da camada seguinte, retro propagar o erro e ajustar os pesos da última camada para a primeira camada.
+Esse caderno possui a implemntação de um controlador fuzzy utilizando o método de inferência de Mamdani. O funcionamento desse sistema consiste no seguinde pseudo código:
+
+```txt
+define a função que representa a entrada de água aleatória no sistema
+define o internvalo de tempo do experimento
+define o limiar desejado
+inicia o nível atual em 0
+para cada instante t faça
+	nível atual recebe o valor de entrada
+	erro recebe o valor de entrada menos o limiar
+	saída recebe o resultado do sistema fuzzy
+	nível atual é decrementado da saída
+repete
+```
 """
 
-# ╔═╡ b2b141c5-e211-44d2-912a-a0d50805b004
-LocalResource("maxresdefault.jpg")
-
-# ╔═╡ 71442437-e06c-4d6a-a37a-0f977429ea0f
+# ╔═╡ 93ceb7a9-1240-476b-aec1-91405434b310
 md"""
-Para a realização desse trabalho foram utilizados como referência:
-1. Slides da disciplina
-1. Playlist do canal [3Blue1Brown](https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi)
-1. Playlist do canal [The Code Train](https://www.youtube.com/playlist?list=PLRqwX-V7Uu6aCibgK1PTWWu9by6XFdCfh)
-1. Livro [Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com/index.html)
+O sistema fuzzy consiste nas seguintes regras
 
-Esse material foi escolhido por apresentar uma implementação simples de uma rede MLP utilizando a notação de matriz, o que facilita o entendimento dos conceitos
+1. se erro positivo então abre
+1. se erro nulo     então mantem
+1. se erro negativo então fecha
 """
 
-# ╔═╡ a8df7778-538b-4bc9-8646-7a5393a6645a
+# ╔═╡ 5f6d9f2b-0519-453b-af79-bead740a6212
 md"""
-## Implementação
-Primeiramente precisamos definir o nosso vetor de entrada x e o nosso vetor de saída y para o problema XOR.
+## 1. Definir o conjunto de dados
+Primeiramente devemos definir as variáveis que compõem os antecedentes e consequentes das regras.
 """
 
-# ╔═╡ 7d9649e6-3d75-4889-a9e2-4fce6ef669be
-x = [
-	0 0
-	0 1
-	1 0
-	1 1
-]
-
-# ╔═╡ f2b5359c-510a-495b-a338-2337c2eb3136
-y = [
-	0
-	1
-	1
-	0
-]
-
-# ╔═╡ 254dfe10-6816-4e62-bff7-f78d63fe99f0
-md"""
-Em seguida devemos definir a nossa função de ativação e a derivada da função de ativação que será utilizada no cálculo do vetor gradiente.
-"""
-
-# ╔═╡ e1d0412f-3e30-4fbd-b9a7-27e53e2d0521
-σ(x) = 1 / ( 1 + exp(-x) )
-
-# ╔═╡ 808804a5-7c81-4f9c-b6e8-090f293d9b16
-dσ(x) =  x * (1 - x)
-
-# ╔═╡ dc634efa-27e6-454b-81e3-1fc1e3ec392a
-md"""
-Também precisamos definir uma estrutura que armazenará as informações da nossa rede neural.
-"""
-
-# ╔═╡ 2fb6bf23-2586-4d49-ac5e-1884a18981ca
-# outer constructor
-# ou com Base.@kwdef
+# ╔═╡ 8f34b3fc-5ed1-4a53-ba19-ba6f06472e18
 begin
-	mutable struct NeuralNetwork
-		input_nodes
-		hidden_nodes
-		output_nodes
-		weights_ih
-		weights_ho
-		bias_h
-		bias_o
-		η
-		last_e
-	end
-	NeuralNetwork(i,h,o,η) = NeuralNetwork(
-		i,
-		h,
-		o,
-		rand(-1:0.01:1,h,i),
-		rand(-1:0.01:1,o,h),
-		rand(-1:0.01:1,h,1),
-		rand(-1:0.01:1,o,1),
-		η,
-		0
+	const x = -100:0.1:100
+	const y =    0:0.1:15
+	const r = [     # regras de ativação (and)
+		1 1
+		2 2
+		3 3
+	]
+end
+
+# ╔═╡ 908ae842-c8e5-4b0b-9fdb-f97a40b2192d
+md"""
+## 2. Definir as funções de pertinência
+Em seguida devemos escolher a função de pertinencia que melhor modela o nosso sistema fuzzy.
+"""
+
+# ╔═╡ f5ad2326-7895-4f87-aeaa-1bbe87c10066
+begin
+	const gausmf(x,k,m) = exp(-k*(x-m)^2)
+end
+
+# ╔═╡ 2e18c5cf-bb50-4851-9cb8-65f1d6969876
+const defSys(param, func) = [
+	t -> func(t, r...) 
+	for r ∈ eachrow(param)
+]
+
+# ╔═╡ 67c2f5e3-f73b-42b5-9e64-428908f8234d
+md"""
+### Antecedente
+"""
+
+# ╔═╡ 674a9853-e61e-4394-9775-c57eab268c5c
+begin
+	const ante_param = [
+		0.000009 -100
+		0.009       0
+		0.000009  100
+	]
+	const ant = defSys(
+		ante_param,
+		gausmf
 	)
 end
 
-# ╔═╡ ef5367b4-811a-4b4a-8bdb-3f10c22351b8
+# ╔═╡ 344b6e13-8cec-478d-b703-5293ee3bae7c
 md"""
-Com isso temos o necessário para implementar as funções de treinamento da rede e a função de previsão.
+com 9
 """
 
-# ╔═╡ 36462e38-b96b-4a9d-9caa-2c51401c8a0e
+# ╔═╡ cf72c755-fe30-4233-978b-452e5ad0be5d
+		# 0.01 -100
+		# 0.01 -75
+		# 0.01 -50
+		# 0.01 -25
+		# 0.01 0
+		# 0.01 25
+		# 0.01 50
+		# 0.01 75
+		# 0.01 100
+	# ]
+		# -101 -100 -82 -68 
+		#  -82 -68 -54 -40
+		#  -54 -40 -26 -12
+		#  -26 -12  2   16
+		#    2  16 30   44
+		#   30  44 58   72
+		#   58  72 100  101
+	# ]
+	
+
+# ╔═╡ 243d8234-a8cb-47be-a338-869f317b2c39
 md"""
-A função de previsão recebe como argumento uma rede neural e uma entrada para prever a saída. A saída da camada oculta é obtida multiplicando a matriz de pesos da camada interna para a oculta pela a matriz entrada somada com a matriz de bias da camada oculta. Já a saída da camada de saída é obtida multiplicando a matriz dos pesos entre a camada oculta e a camada de saída pela matriz de saída da camada oculta somada com a matriz de bias da camada de saída.
+### Consequente
 """
 
-# ╔═╡ 5b4ec109-f988-4bf1-92cc-e2e40f4dd0c4
+# ╔═╡ 0025ffca-e730-48e8-879c-04d0e5a8a307
 begin
-	predict(a) = x -> predict(a,x)
-	function predict(this::NeuralNetwork,X)
-		H = this.weights_ih * X .+ this.bias_h .|> σ
-		O = this.weights_ho * H .+ this.bias_o .|> σ
-		O .|> round
-	end
-end
-
-# ╔═╡ d02b825a-70aa-4549-9d16-606994f39de4
-md"""
-A função de treinamento recebe como argumento uma rede neural, uma amostra dos dados de entrada e a saída desejada. O algoritmo consiste em 3 passos: Feedforward, Backpropagation Output e Backpropagation Hidden. A etapa Feedforward consiste na previsão do sistema. Em seguida, a saída desejada será utilizada para calcular o erro da rede, subtraíndo a pela saída da rede. A partir deste erro podemos ajustar o peso para melhorar a precisão da rede nas etapas de Backpropagation Output e Hidden.
-"""
-
-# ╔═╡ 0aa61377-a374-4c5e-9aa2-54fede251cc4
-begin
-	fit!(X,Y) = nn -> fit(nn,X,Y)
-	function fit!(this::NeuralNetwork,X,Y)
-		
-		### Feedforward
-		
-		H = σ.(this.weights_ih * X + this.bias_h)
-		O = σ.(this.weights_ho * H + this.bias_o)
-	
-		### Backpropagation Output
-		
-		Oe = Y .- O
-		O∇ = dσ.(O) .* Oe .* this.η
-		
-		δho = O∇ * H'
-		this.weights_ho += δho
-		this.bias_o     += O∇
-	
-		### Backpropagation Hidden
-	
-		He = this.weights_ho' * Oe
-		H∇ = dσ.(H) .* He .* this.η
-		δih = H∇ * X'
-	
-		this.weights_ih += δih
-		this.bias_h     += H∇
-		
-		this.last_e += mean(abs.(Oe))
-	end
-end
-
-# ╔═╡ fbd1066f-eb42-49cf-908e-1b93b281f6f9
-md"""
-Por fim devemos treinar o nosso modelo para todas as entradas de X pela quantidade de épocas estabelecidas até se atingit um erro dentro da tolerância.
-"""
-
-# ╔═╡ b6013f22-d9d6-4502-b93d-14c5c8c2f8b3
-nn = NeuralNetwork(
-		2,
-		2,
-		1,
-		0.3
+	const cons_param = [
+		0.15   0
+		0.015 10
+		0.15  15
+	]
+	const con = defSys(
+		cons_param,
+		gausmf
 	)
-
-# ╔═╡ aa075c80-a5b6-4e9d-87e1-69ccfee56792
-begin
-	push!(y) = x -> Base.push!(y,x)
-	τ = 0.05
-	Ω = 10000
-	epocas = 0
-	erroEpoca = Float64[]
-	
-	while true
-		nn.last_e = 0
-		
-		size(x,1) |> randperm .|> i -> fit!(nn,x[i,:],y[i])
-		
-		# for i in randperm(size(x,1))
-		# 	fit!(nn,x[i,:],y[i])
-		# end
-		
-		global epocas += 1
-		nn.last_e / length(x) |> push!(erroEpoca)
-		
-		(epocas ≥ Ω || erroEpoca[end] ≤ τ) ? break : continue
-	end
 end
 
-# ╔═╡ 537976fd-1fb7-4235-8759-dfe53deeb9f5
+# ╔═╡ d654c20e-2bca-4945-984a-491888055dbb
+		# 0.3 0
+		# 0.3 2
+		# 0.3 4
+		# 0.3 6
+		# 0.3 8
+		# 0.3 10
+		# 0.3 12
+		# 0.3 14
+		# 0.3 15
+	# ]
+		# -1   0  2  3
+		#  2   3  4  5
+		#  4   5  6  7
+		#  6   7  8  9
+		#  8   9 10 11
+		#  10 11 12 13
+		#  12 13 15 16
+	# ]
+
+# ╔═╡ bc794c8c-6651-458b-aba3-a608d0f1c87f
 md"""
-## Análise
+### Plot
 """
 
-# ╔═╡ 10436ba9-4bca-4a02-8d8d-48a44550c8b7
+# ╔═╡ 226df3c4-1f78-42f0-9173-909775c90d10
+begin
+	const antecedente = plot(
+		x, [t -> a(t) for a ∈ ant];
+	)
+	const consequente = plot(
+		y, [t -> c(t) for c ∈ con];
+	)
+	plot(
+		antecedente, consequente;
+		layout = (1, 2),
+		size = (700,200)
+	)
+end
+
+# ╔═╡ 2816cb27-d649-42cf-8d46-31aa4af936b4
 md"""
-É possível notar que o a rede demora certa de 1000 iterações para atingir um erro aceitável.
+## Defuzzyficação Máximo dos Máximos
+Iremos utilizar o método de defuzzyficação máximo dos máximos por que o mais simples de ser implementado.
 """
 
-# ╔═╡ 30c1d9da-5ac2-4217-8669-16871cafa9a0
-println("Epocas: ", epocas, " \n", "Erro:   ", erroEpoca[end])
+# ╔═╡ b20c7bc5-8026-4951-8c18-3a8d4c601c2c
+const MoM(u,y) = y[
+	reduce(
+		(acc,r) -> u[acc] <= u[r] ? r : acc ,
+		1:length(u)
+	)
+]
 
-# ╔═╡ fb498595-7ca6-4af5-ad86-85c1a63f753e
-plot(1:epocas, erroEpoca)
+# ╔═╡ 7d353e2e-3d84-49d6-9f99-20ded981a842
+md"""
+## Calcular a saída de cada regra (minimo)
+"""
 
-# ╔═╡ fc1c4258-5ce2-4400-b3c8-72cecaa80a8a
-nn
+# ╔═╡ 4042b1ad-234b-426d-9ae6-24ec449addd0
+begin
+	const toMatrix(x) = hcat(x...)  # feature request
+	const output(con,w,y,r)::Matrix{Float64} = [ 
+		min.(
+			w[a],
+			con[c].(y)
+		) 
+		for (a, c) ∈ eachrow(r) ] |> toMatrix
+end
 
-# ╔═╡ 1f7d1208-2c25-4fb0-b7a6-da55bfd2b7ba
-x |> eachrow .|> predict(nn) .|> println;
+# ╔═╡ 93b9d838-bffa-48a8-b692-6f823d78fcaf
+md"""
+## Mamdani
+As etapas 3,4,5 e 6 devem ser realizadas para cada ponto do meu conjunto X. Portanto, devem estar dentro de um loop:
+"""
+
+# ╔═╡ 38e4f6de-beb0-403a-b693-c183a0812755
+function mamdani(ant,con,i,y,r)
+	# 3. Calcular o grau de ativação dos antecedentes
+		# Grau de Ativação do Antecedente 1
+		w = [a(i) for a ∈ ant]
+		
+		# Grau de Ativação do Antecedente 2
+		# Vazio
+	
+	# 4. Calcular a saída de cada regra (minimo)
+		v = output(con,w,y,r)
+	
+	# 5. Agregar as saídas das regras (máximo)	
+		u = maximum(v, dims = 2) |> vec
+	
+	# 6. Defuzificar (saída com valor numérico)
+		MoM(u,y)
+end
+
+# ╔═╡ b3349727-73cb-4624-894b-c14224ecae8a
+md"""
+Após executar o trecho de código acima, teremos o array output que contém os valores de todos os pontos encontrados após a defuzzyficação.
+"""
+
+# ╔═╡ 4eec1585-8b31-43e4-b28d-86705a76ba0f
+plot(
+	x, i -> mamdani(ant,con,i,y,r);
+	size   = (350,200),
+)
+
+# ╔═╡ 504627f8-1d0c-4943-ad3b-2284db00d26c
+md"""
+# Simulação
+"""
+
+# ╔═╡ 7206cbae-96d2-4588-80af-3f3349065faf
+begin
+	# entrada(t) = 7.5 * sin(0.25t) * cos(t) + 7.5
+	# entrada(t) = 7.5+7.5sin(0.5t)
+	entrada(t) = 10
+	t = 0:0.1:20
+	limiar = 70
+end
+
+# ╔═╡ 35d1a23e-a82a-4cdc-b962-66ee40cadc8b
+plot(t,entrada;
+	size   = (350,200),
+)
+
+# ╔═╡ fd443e1c-1cf3-4000-b299-d629d97ef925
+function simulation(entrada,t,limiar)
+	atual  = 0
+	historico = []
+	for i ∈ t
+		atual += entrada(i)
+		push!(historico, atual)
+		erro  = atual - limiar
+		saida = mamdani(ant,con,erro,y,r)
+		atual -= saida
+	end
+	return historico
+end
+
+# ╔═╡ 9b9a863d-6331-42a8-99b8-04c25c070efd
+s = simulation(entrada,t,limiar)
+
+# ╔═╡ 475a9d56-1009-48ae-bd86-7741fd512c65
+map(x -> abs(limiar - x), s) |> mean
+
+# ╔═╡ e6c264e8-7015-4f70-bb37-3e165cafde6d
+plot(t,[s, _ -> limiar,];
+	size = (350,200),
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
@@ -239,7 +308,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.3"
 manifest_format = "2.0"
-project_hash = "5aea8cf7b3ce2a34368e390ed8e5ab6f1e79c921"
+project_hash = "9bcef939b0cb56bff56589ca9019daf65482984e"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -1199,32 +1268,38 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╟─1beb82cf-43a5-4fab-b311-7c096b435413
-# ╠═2070ca57-d02e-492e-afaf-081dc4ca6559
-# ╟─e5d1d090-1bd5-4e3f-b39c-e324d525a47f
-# ╟─b2b141c5-e211-44d2-912a-a0d50805b004
-# ╟─71442437-e06c-4d6a-a37a-0f977429ea0f
-# ╟─a8df7778-538b-4bc9-8646-7a5393a6645a
-# ╠═7d9649e6-3d75-4889-a9e2-4fce6ef669be
-# ╠═f2b5359c-510a-495b-a338-2337c2eb3136
-# ╟─254dfe10-6816-4e62-bff7-f78d63fe99f0
-# ╠═e1d0412f-3e30-4fbd-b9a7-27e53e2d0521
-# ╠═808804a5-7c81-4f9c-b6e8-090f293d9b16
-# ╟─dc634efa-27e6-454b-81e3-1fc1e3ec392a
-# ╠═2fb6bf23-2586-4d49-ac5e-1884a18981ca
-# ╟─ef5367b4-811a-4b4a-8bdb-3f10c22351b8
-# ╟─36462e38-b96b-4a9d-9caa-2c51401c8a0e
-# ╠═5b4ec109-f988-4bf1-92cc-e2e40f4dd0c4
-# ╟─d02b825a-70aa-4549-9d16-606994f39de4
-# ╠═0aa61377-a374-4c5e-9aa2-54fede251cc4
-# ╟─fbd1066f-eb42-49cf-908e-1b93b281f6f9
-# ╠═b6013f22-d9d6-4502-b93d-14c5c8c2f8b3
-# ╠═aa075c80-a5b6-4e9d-87e1-69ccfee56792
-# ╟─537976fd-1fb7-4235-8759-dfe53deeb9f5
-# ╟─10436ba9-4bca-4a02-8d8d-48a44550c8b7
-# ╠═30c1d9da-5ac2-4217-8669-16871cafa9a0
-# ╠═fb498595-7ca6-4af5-ad86-85c1a63f753e
-# ╠═fc1c4258-5ce2-4400-b3c8-72cecaa80a8a
-# ╠═1f7d1208-2c25-4fb0-b7a6-da55bfd2b7ba
+# ╟─af34fa35-4e62-4df0-9c54-6a91e9beb3aa
+# ╠═fbe88d29-171d-4778-87af-6ffd5a98fea7
+# ╟─01295753-e7aa-4f05-b592-d9e4d055091e
+# ╟─93ceb7a9-1240-476b-aec1-91405434b310
+# ╟─5f6d9f2b-0519-453b-af79-bead740a6212
+# ╠═8f34b3fc-5ed1-4a53-ba19-ba6f06472e18
+# ╟─908ae842-c8e5-4b0b-9fdb-f97a40b2192d
+# ╠═f5ad2326-7895-4f87-aeaa-1bbe87c10066
+# ╠═2e18c5cf-bb50-4851-9cb8-65f1d6969876
+# ╟─67c2f5e3-f73b-42b5-9e64-428908f8234d
+# ╠═674a9853-e61e-4394-9775-c57eab268c5c
+# ╟─344b6e13-8cec-478d-b703-5293ee3bae7c
+# ╟─cf72c755-fe30-4233-978b-452e5ad0be5d
+# ╟─243d8234-a8cb-47be-a338-869f317b2c39
+# ╠═0025ffca-e730-48e8-879c-04d0e5a8a307
+# ╟─d654c20e-2bca-4945-984a-491888055dbb
+# ╟─bc794c8c-6651-458b-aba3-a608d0f1c87f
+# ╠═226df3c4-1f78-42f0-9173-909775c90d10
+# ╟─2816cb27-d649-42cf-8d46-31aa4af936b4
+# ╠═b20c7bc5-8026-4951-8c18-3a8d4c601c2c
+# ╟─7d353e2e-3d84-49d6-9f99-20ded981a842
+# ╠═4042b1ad-234b-426d-9ae6-24ec449addd0
+# ╟─93b9d838-bffa-48a8-b692-6f823d78fcaf
+# ╠═38e4f6de-beb0-403a-b693-c183a0812755
+# ╟─b3349727-73cb-4624-894b-c14224ecae8a
+# ╠═4eec1585-8b31-43e4-b28d-86705a76ba0f
+# ╟─504627f8-1d0c-4943-ad3b-2284db00d26c
+# ╠═7206cbae-96d2-4588-80af-3f3349065faf
+# ╠═35d1a23e-a82a-4cdc-b962-66ee40cadc8b
+# ╠═fd443e1c-1cf3-4000-b299-d629d97ef925
+# ╠═9b9a863d-6331-42a8-99b8-04c25c070efd
+# ╠═475a9d56-1009-48ae-bd86-7741fd512c65
+# ╠═e6c264e8-7015-4f70-bb37-3e165cafde6d
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
