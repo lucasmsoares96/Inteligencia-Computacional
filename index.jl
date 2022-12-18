@@ -17,6 +17,7 @@ md"""
 
 # ╔═╡ 360bb77d-96ae-4d20-84f5-f78ad0b8ed83
 md"""
+1. [Multilayer Perceptron](https://lucasmsoares96.github.io/Inteligencia-Computacional/MLP.html)
 1. [Previsão Bolsa de Valores](https://lucasmsoares96.github.io/Inteligencia-Computacional/Comparativo.html)
 """
 
